@@ -1,5 +1,7 @@
 #include <Python.h>
 #include <torch/script.h>
+#include <chrono>
+using namespace std::chrono;
 
 #include "cpu/segment_csr_cpu.h"
 #include "utils.h"
@@ -16,6 +18,23 @@ PyMODINIT_FUNC PyInit__segment_csr_cpu(void) { return NULL; }
 #endif
 #endif
 
+void check_error(float* src, float* dest, int64_t row, int64_t col, float err) {
+	float total_diff = 0.0;
+    for (int64_t i = 0; i < row; i++) {
+        for (int64_t j = 0; j < col; j++) {
+            float diff = std::fabs(src[i*col + j] - dest[i*col + j]);
+            if (diff > err) {
+                total_diff += diff;
+                std::cout << "On row = " << i << ", col = " << j
+                          << ", src = " << src[i*col + j]
+                          << ", dest = " << dest[i*col + j]
+                          << ", diff = " << diff << std::endl;
+            }
+        }
+    }
+    std::cout << "total_diff = " << total_diff << std::endl;
+}
+
 std::tuple<torch::Tensor, torch::optional<torch::Tensor>>
 segment_csr_fw(torch::Tensor src, torch::Tensor indptr,
                torch::optional<torch::Tensor> optional_out,
@@ -27,7 +46,29 @@ segment_csr_fw(torch::Tensor src, torch::Tensor indptr,
     AT_ERROR("Not compiled with CUDA support");
 #endif
   } else {
-    return segment_csr_cpu(src, indptr, optional_out, reduce);
+	// auto start_time_all = system_clock::now();
+	std::tuple<torch::Tensor, torch::optional<torch::Tensor>> tmp1 = 
+		segment_csr_cpu(src, indptr, optional_out, reduce);
+	// duration<double, std::milli> diff = (system_clock::now() - start_time_all);
+    // std::cout << "total elapsed time of original segment_csr: " << diff.count() << std::endl;
+
+	/*
+	auto start_time_new = system_clock::now();
+	std::tuple<torch::Tensor, torch::optional<torch::Tensor>> tmp1 = 
+		segment_csr_cpu_new_version(src, indptr, optional_out, reduce);
+	duration<double, std::milli> diff_new = (system_clock::now() - start_time_new);
+    std::cout << "total elapsed time of my segment_csr: " << diff_new.count() << std::endl;
+	*/
+
+/*
+	float* src_data = std::get<0>(tmp).data_ptr<float>();
+	float* dest_data = std::get<0>(tmp1).data_ptr<float>();
+	auto row = indptr.numel() - 1;
+	auto col = src.numel() / src.size(0);
+	check_error(src_data, dest_data, row, col, 0.00001);
+*/
+
+	return tmp1;
   }
 }
 

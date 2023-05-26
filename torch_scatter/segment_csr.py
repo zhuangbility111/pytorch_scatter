@@ -97,6 +97,9 @@ def segment_csr(src: torch.Tensor, indptr: torch.Tensor,
 
         torch.Size([10, 3, 64])
     """
+    # print("src_size = ", src.size())
+    # print("indptr_size = ", indptr.size())
+    # print("reduce = ", reduce)
     if reduce == 'sum' or reduce == 'add':
         return segment_sum_csr(src, indptr, out)
     elif reduce == 'mean':
